@@ -15,7 +15,7 @@
 
 1. 下载或克隆本项目到本地
    ```bash
-   git clone https://github.com/your-username/AI-Dialogue-Embellishment-Plugin.git
+   git clone https://github.com/Han-cy77/ai-dialogue-embellishment-plugin.git
    ```
 
 2. 打开 Chrome 浏览器，访问 `chrome://extensions/`
