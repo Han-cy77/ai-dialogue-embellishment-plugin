@@ -1,15 +1,18 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
   const apiKeyInput = document.getElementById('apiKey');
   const saveBtn = document.getElementById('saveBtn');
   const statusDiv = document.getElementById('status');
 
-  chrome.storage.sync.get(['apiKey'], function(result) {
-    if (result.apiKey) {
-      apiKeyInput.value = result.apiKey;
+  chrome.storage.local.get(['encryptedApiKey'], async function(result) {
+    if (result.encryptedApiKey) {
+      const decryptedKey = await CryptoUtil.decrypt(result.encryptedApiKey);
+      if (decryptedKey) {
+        apiKeyInput.value = decryptedKey;
+      }
     }
   });
 
-  saveBtn.addEventListener('click', function() {
+  saveBtn.addEventListener('click', async function() {
     const apiKey = apiKeyInput.value.trim();
     
     if (!apiKey) {
@@ -17,9 +20,15 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    chrome.storage.sync.set({ apiKey: apiKey }, function() {
-      showStatus('保存成功！', 'success');
-    });
+    try {
+      const encryptedKey = await CryptoUtil.encrypt(apiKey);
+      chrome.storage.local.set({ encryptedApiKey: encryptedKey }, function() {
+        showStatus('保存成功！（已加密存储）', 'success');
+      });
+    } catch (error) {
+      console.error('Encryption failed:', error);
+      showStatus('加密失败，请重试', 'error');
+    }
   });
 
   function showStatus(message, type) {

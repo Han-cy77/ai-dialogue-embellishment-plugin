@@ -1,3 +1,5 @@
+importScripts('crypto.js');
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'sendRequest') {
     handleApiRequest(request.data)
@@ -40,9 +42,15 @@ async function handleEmbellishRequest(data) {
   const { text } = data;
   
   const result = await new Promise((resolve, reject) => {
-    chrome.storage.sync.get(['apiKey'], async function(result) {
-      if (!result.apiKey) {
+    chrome.storage.local.get(['encryptedApiKey'], async function(result) {
+      if (!result.encryptedApiKey) {
         reject(new Error('请先在插件弹窗中配置 API Key'));
+        return;
+      }
+      
+      const apiKey = await CryptoUtil.decrypt(result.encryptedApiKey);
+      if (!apiKey) {
+        reject(new Error('API Key 解密失败，请重新配置'));
         return;
       }
       
@@ -51,7 +59,7 @@ async function handleEmbellishRequest(data) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${result.apiKey}`
+            'Authorization': `Bearer ${apiKey}`
           },
           body: JSON.stringify({
             model: 'Qwen/Qwen2.5-7B-Instruct',
