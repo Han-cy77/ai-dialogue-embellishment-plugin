@@ -1,15 +1,37 @@
 (function() {
   'use strict';
   
-  console.log('AI 润色插件已加载');
-
-  const BUTTON_ID = 'ai-embellish-btn';
-  const BUTTON_TEXT_DEFAULT = '✨ 润色';
-  const BUTTON_TEXT_LOADING = '⏳ 润色中...';
-  
   let currentInputElement = null;
   let embellishButton = null;
   let observer = null;
+  
+  // 按钮常量
+  const BUTTON_ID = 'ai-embellish-btn';
+  let BUTTON_TEXT_DEFAULT = '✨ 润色';
+  let BUTTON_TEXT_LOADING = '⏳ 润色中...';
+  
+  // 初始化：加载语言设置
+  function initI18n() {
+    chrome.storage.local.get(['language'], function(result) {
+      if (result.language) {
+        I18n.setLocale(result.language);
+      }
+      updateButtonTexts();
+      console.log(I18n.t('pluginLoaded'));
+    });
+  }
+  
+  // 更新按钮文本
+  function updateButtonTexts() {
+    BUTTON_TEXT_DEFAULT = I18n.t('buttonDefault');
+    BUTTON_TEXT_LOADING = I18n.t('buttonLoading');
+    
+    if (embellishButton) {
+      if (!embellishButton.classList.contains('loading')) {
+        embellishButton.textContent = BUTTON_TEXT_DEFAULT;
+      }
+    }
+  }
 
   function findInputElement() {
     const selectors = [
@@ -232,6 +254,9 @@
   }
 
   function init() {
+    // 初始化国际化
+    initI18n();
+    
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', pollForInputElement);
     } else {
@@ -241,6 +266,14 @@
     window.addEventListener('resize', function() {
       if (currentInputElement && embellishButton) {
         positionButton(currentInputElement, embellishButton);
+      }
+    });
+    
+    // 监听语言变化
+    chrome.storage.onChanged.addListener(function(changes, areaName) {
+      if (changes.language && changes.language.newValue) {
+        I18n.setLocale(changes.language.newValue);
+        updateButtonTexts();
       }
     });
   }

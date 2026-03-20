@@ -48,6 +48,7 @@
 - **原生 JavaScript**：轻量级，无框架依赖
 - **SiliconFlow API**：兼容 OpenAI 接口格式的免费大模型服务
 - **Web Crypto API**：浏览器原生加密接口
+- **国际化支持**：支持中文/英文切换
 
 ## 项目结构
 
@@ -60,6 +61,7 @@ ai-dialogue-embellishment-plugin/
 ├── content.js         # 内容脚本（核心交互逻辑）
 ├── content.css        # 注入按钮样式
 ├── crypto.js          # 加密工具模块
+├── i18n.js            # 国际化模块
 └── icons/             # 图标资源
 ```
 
