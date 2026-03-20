@@ -1,4 +1,4 @@
-# AI-Dialogue-Embellishment-Plugin
+# AI对话润色插件（AI-Dialogue-Embellishment-Plugin）
 
 [![JavaScript](https://img.shields.io/badge/JavaScript-ES6+-yellow?logo=javascript)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
