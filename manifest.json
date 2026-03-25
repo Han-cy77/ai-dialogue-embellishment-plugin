@@ -9,7 +9,17 @@
     "scripting"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://copilot.microsoft.com/*",
+    "https://www.doubao.com/*",
+    "https://doubao.com/*",
+    "https://chat.deepseek.com/*",
+    "https://www.deepseek.com/*",
+    "https://deepseek.com/*",
+    "https://yuanbao.tencent.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -18,23 +28,33 @@
       "48": "icons/icon48.png",
       "128": "icons/icon128.png"
     }
-
   },
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://copilot.microsoft.com/*",
+        "https://www.doubao.com/*",
+        "https://doubao.com/*",
+        "https://chat.deepseek.com/*",
+        "https://www.deepseek.com/*",
+        "https://deepseek.com/*",
+        "https://yuanbao.tencent.com/*"
+      ],
       "js": ["i18n.js", "content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
     }
-    ],
+  ],
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   }
-
 }

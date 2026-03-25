@@ -1,172 +1,340 @@
 (function() {
   'use strict';
-  
+
+  const BUTTON_ID = 'ai-embellish-btn';
+  const SITE_CONFIGS = [
+    {
+      name: 'doubao',
+      hosts: ['www.doubao.com', 'doubao.com'],
+      selectors: [
+        'textarea',
+        'div[contenteditable="true"][role="textbox"]',
+        'div[contenteditable="true"]'
+      ]
+    },
+    {
+      name: 'deepseek',
+      hosts: ['chat.deepseek.com', 'www.deepseek.com', 'deepseek.com'],
+      selectors: [
+        'textarea',
+        'div[contenteditable="true"][role="textbox"]',
+        'div[contenteditable="true"]'
+      ]
+    },
+    {
+      name: 'yuanbao',
+      hosts: ['yuanbao.tencent.com'],
+      selectors: [
+        'textarea',
+        'div[contenteditable="true"][role="textbox"]',
+        'div[contenteditable="true"]'
+      ]
+    },
+    {
+      name: 'general-ai-chat',
+      hosts: [
+        'chatgpt.com',
+        'chat.openai.com',
+        'claude.ai',
+        'gemini.google.com',
+        'copilot.microsoft.com'
+      ],
+      selectors: [
+        'textarea',
+        'div[contenteditable="true"][role="textbox"]',
+        'div[contenteditable="true"]'
+      ]
+    }
+  ];
+  const GENERIC_SELECTORS = [
+    'textarea',
+    'input[type="text"]',
+    'input[type="search"]',
+    'div[contenteditable="true"][role="textbox"]',
+    'div[contenteditable="true"]'
+  ];
+
   let currentInputElement = null;
   let embellishButton = null;
   let observer = null;
-  
-  // 按钮常量
-  const BUTTON_ID = 'ai-embellish-btn';
-  let BUTTON_TEXT_DEFAULT = '✨ 润色';
-  let BUTTON_TEXT_LOADING = '⏳ 润色中...';
-  
-  // 初始化：加载语言设置
+  let rafId = null;
+  let buttonTextDefault = '润色';
+  let buttonTextLoading = '润色中...';
+
   function initI18n() {
     chrome.storage.local.get(['language'], function(result) {
-      if (result.language) {
+      if (typeof I18n !== 'undefined' && result.language) {
         I18n.setLocale(result.language);
       }
+
       updateButtonTexts();
-      console.log(I18n.t('pluginLoaded'));
+
+      if (typeof I18n !== 'undefined') {
+        console.log(I18n.t('pluginLoaded'));
+      }
     });
   }
-  
-  // 更新按钮文本
+
+  function getMessage(key, fallback) {
+    if (typeof I18n !== 'undefined') {
+      return I18n.t(key);
+    }
+
+    return fallback;
+  }
+
   function updateButtonTexts() {
-    BUTTON_TEXT_DEFAULT = I18n.t('buttonDefault');
-    BUTTON_TEXT_LOADING = I18n.t('buttonLoading');
-    
-    if (embellishButton) {
-      if (!embellishButton.classList.contains('loading')) {
-        embellishButton.textContent = BUTTON_TEXT_DEFAULT;
-      }
+    buttonTextDefault = getMessage('buttonDefault', '润色');
+    buttonTextLoading = getMessage('buttonLoading', '润色中...');
+
+    if (embellishButton && !embellishButton.classList.contains('loading')) {
+      embellishButton.textContent = buttonTextDefault;
     }
   }
 
+  function isVisible(element) {
+    if (!element || !element.isConnected) {
+      return false;
+    }
+
+    const rect = element.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(element);
+    return style.visibility !== 'hidden' && style.display !== 'none';
+  }
+
+  function isEditableElement(element) {
+    if (!element || !isVisible(element) || element.disabled || element.readOnly) {
+      return false;
+    }
+
+    if (element.matches('textarea')) {
+      return true;
+    }
+
+    if (element.matches('input')) {
+      const type = (element.getAttribute('type') || 'text').toLowerCase();
+      return ['text', 'search'].includes(type);
+    }
+
+    return element.getAttribute('contenteditable') === 'true';
+  }
+
+  function getSiteSelectors() {
+    const host = window.location.hostname;
+    const siteConfig = SITE_CONFIGS.find((config) => config.hosts.includes(host));
+    return siteConfig ? siteConfig.selectors : [];
+  }
+
+  function getFocusedEditable() {
+    const activeElement = document.activeElement;
+    if (isEditableElement(activeElement)) {
+      return activeElement;
+    }
+
+    const nearestEditable = activeElement && activeElement.closest
+      ? activeElement.closest('textarea, input[type="text"], input[type="search"], div[contenteditable="true"]')
+      : null;
+
+    return isEditableElement(nearestEditable) ? nearestEditable : null;
+  }
+
   function findInputElement() {
-    const selectors = [
-      'textarea[placeholder*="Message"]',
-      'textarea[placeholder*="消息"]',
-      'textarea[placeholder*="输入"]',
-      'textarea[placeholder*="Ask"]',
-      'textarea[placeholder*="Send"]',
-      'div[contenteditable="true"]',
-      'textarea'
-    ];
-    
+    const focusedEditable = getFocusedEditable();
+    if (focusedEditable) {
+      return focusedEditable;
+    }
+
+    const selectors = [...getSiteSelectors(), ...GENERIC_SELECTORS];
     for (const selector of selectors) {
       const elements = document.querySelectorAll(selector);
       for (const element of elements) {
-        const rect = element.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const style = window.getComputedStyle(element);
-          if (style.visibility !== 'hidden' && style.display !== 'none') {
-            return element;
-          }
+        if (isEditableElement(element)) {
+          return element;
         }
       }
     }
+
     return null;
   }
 
   function getInputContent(element) {
-    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-      return element.value.trim();
-    } else if (element.getAttribute('contenteditable') === 'true') {
-      return element.innerText.trim() || element.textContent.trim();
+    if (!element) {
+      return '';
     }
-    return '';
+
+    if (element.matches('textarea, input')) {
+      return element.value.trim();
+    }
+
+    return (element.innerText || element.textContent || '').trim();
+  }
+
+  function setContentEditableText(element, content) {
+    element.focus();
+
+    const selection = window.getSelection();
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+
+    const inserted = document.execCommand && document.execCommand('insertText', false, content);
+    if (!inserted) {
+      element.innerHTML = '';
+      const lines = content.split('\n');
+      lines.forEach((line, index) => {
+        if (index > 0) {
+          element.appendChild(document.createElement('br'));
+        }
+        element.appendChild(document.createTextNode(line));
+      });
+    }
   }
 
   function setInputContent(element, content) {
-    if (element.tagName === 'TEXTAREA' || element.tagName === 'INPUT') {
-      element.value = content;
-    } else if (element.getAttribute('contenteditable') === 'true') {
-      element.innerText = content;
+    if (!element) {
+      return;
     }
-    
+
+    if (element.matches('textarea, input')) {
+      const prototype = element.tagName === 'TEXTAREA'
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+      const valueSetter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+
+      if (valueSetter) {
+        valueSetter.call(element, content);
+      } else {
+        element.value = content;
+      }
+    } else if (element.getAttribute('contenteditable') === 'true') {
+      setContentEditableText(element, content);
+    }
+
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
-    
-    const inputEvent = new InputEvent('input', {
+    element.dispatchEvent(new InputEvent('input', {
       bubbles: true,
       cancelable: true,
       inputType: 'insertText',
       data: content
-    });
-    element.dispatchEvent(inputEvent);
+    }));
   }
 
   function createEmbellishButton() {
-    if (document.getElementById(BUTTON_ID)) {
-      return document.getElementById(BUTTON_ID);
+    const existingButton = document.getElementById(BUTTON_ID);
+    if (existingButton) {
+      return existingButton;
     }
-    
+
     const button = document.createElement('button');
     button.id = BUTTON_ID;
     button.className = 'ai-embellish-btn';
-    button.textContent = BUTTON_TEXT_DEFAULT;
-    
+    button.type = 'button';
+    button.textContent = buttonTextDefault;
     button.addEventListener('click', handleEmbellishClick);
-    
+    document.body.appendChild(button);
+
     return button;
   }
 
   function positionButton(inputElement, button) {
+    if (!inputElement || !button || !isVisible(inputElement)) {
+      if (button) {
+        button.style.display = 'none';
+      }
+      return;
+    }
+
+    button.style.display = 'block';
+    button.style.position = 'fixed';
+
     const rect = inputElement.getBoundingClientRect();
-    
-    let container = inputElement.parentElement;
-    while (container && window.getComputedStyle(container).position === 'static' && container !== document.body) {
-      container = container.parentElement;
+    const buttonRect = button.getBoundingClientRect();
+    const margin = 8;
+    const left = Math.min(
+      window.innerWidth - buttonRect.width - margin,
+      Math.max(margin, rect.right - buttonRect.width)
+    );
+    const top = Math.min(
+      window.innerHeight - buttonRect.height - margin,
+      Math.max(margin, rect.bottom + margin)
+    );
+
+    button.style.left = `${left}px`;
+    button.style.top = `${top}px`;
+  }
+
+  function updateButtonPosition() {
+    if (!embellishButton) {
+      return;
     }
-    
-    if (!container || container === document.body) {
-      container = document.body;
+
+    if (!currentInputElement || !currentInputElement.isConnected) {
+      currentInputElement = findInputElement();
     }
-    
-    const containerRect = container.getBoundingClientRect();
-    
-    button.style.position = 'absolute';
-    button.style.right = `${window.innerWidth - rect.right + 8}px`;
-    button.style.bottom = `${window.innerHeight - rect.bottom + 8}px`;
-    
-    document.body.appendChild(button);
+
+    positionButton(currentInputElement, embellishButton);
+  }
+
+  function schedulePositionUpdate() {
+    if (rafId !== null) {
+      return;
+    }
+
+    rafId = window.requestAnimationFrame(() => {
+      rafId = null;
+      updateButtonPosition();
+    });
   }
 
   function injectButton(inputElement) {
-    if (!inputElement) return;
-    
-    if (embellishButton && embellishButton.parentElement) {
-      embellishButton.remove();
+    if (!inputElement || !isEditableElement(inputElement)) {
+      return;
     }
-    
-    embellishButton = createEmbellishButton();
+
     currentInputElement = inputElement;
-    positionButton(inputElement, embellishButton);
-    
-    console.log('润色按钮已注入');
+    embellishButton = createEmbellishButton();
+    schedulePositionUpdate();
   }
 
   function setLoadingState(isLoading) {
-    if (!embellishButton) return;
-    
-    if (isLoading) {
-      embellishButton.textContent = BUTTON_TEXT_LOADING;
-      embellishButton.classList.add('loading');
-    } else {
-      embellishButton.textContent = BUTTON_TEXT_DEFAULT;
-      embellishButton.classList.remove('loading');
+    if (!embellishButton) {
+      return;
     }
+
+    embellishButton.textContent = isLoading ? buttonTextLoading : buttonTextDefault;
+    embellishButton.classList.toggle('loading', isLoading);
   }
 
-  function handleEmbellishClick(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    
+  function handleEmbellishClick(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!currentInputElement || !currentInputElement.isConnected) {
+      currentInputElement = findInputElement();
+    }
+
     if (!currentInputElement) {
-      alert('未找到输入框');
+      alert(getMessage('inputNotFound', '未找到可用的输入框'));
       return;
     }
-    
+
     const content = getInputContent(currentInputElement);
-    
     if (!content) {
-      alert('请输入草稿');
+      alert(getMessage('inputRequired', '请先输入需要润色的内容'));
       return;
     }
-    
+
     setLoadingState(true);
-    
+
     chrome.runtime.sendMessage(
       {
         action: 'embellish_text',
@@ -174,23 +342,23 @@
       },
       function(response) {
         setLoadingState(false);
-        
+
         if (chrome.runtime.lastError) {
-          console.error('发送消息失败:', chrome.runtime.lastError);
-          alert('发送请求失败，请检查插件配置');
+          console.error('Failed to send message', chrome.runtime.lastError);
+          alert(getMessage('requestFailed', '发送请求失败，请检查插件配置'));
           return;
         }
-        
+
         if (response && response.success) {
           const embellishedText = response.data?.text || response.data;
           if (embellishedText) {
             setInputContent(currentInputElement, embellishedText);
-            console.log('润色完成，已回填文本');
+            schedulePositionUpdate();
           }
-        } else {
-          const errorMsg = response?.error || '润色失败，请稍后重试';
-          alert(errorMsg);
+          return;
         }
+
+        alert(response?.error || getMessage('embellishFailed', '润色失败，请稍后重试'));
       }
     );
   }
@@ -199,85 +367,60 @@
     if (observer) {
       observer.disconnect();
     }
-    
-    observer = new MutationObserver(function(mutations) {
-      let shouldReinject = false;
-      
-      for (const mutation of mutations) {
-        if (mutation.type === 'childList' || mutation.type === 'attributes') {
-          shouldReinject = true;
-          break;
-        }
-      }
-      
-      if (shouldReinject) {
-        const inputElement = findInputElement();
-        if (inputElement && inputElement !== currentInputElement) {
-          injectButton(inputElement);
-        }
+
+    observer = new MutationObserver(() => {
+      const inputElement = findInputElement();
+      if (inputElement) {
+        injectButton(inputElement);
+      } else if (embellishButton) {
+        embellishButton.style.display = 'none';
       }
     });
-    
+
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['style', 'class', 'hidden']
+      attributeFilter: ['style', 'class', 'hidden', 'contenteditable']
     });
   }
 
-  function pollForInputElement() {
-    let attempts = 0;
-    const maxAttempts = 30;
-    const pollInterval = 500;
-    
-    function poll() {
-      attempts++;
-      
-      const inputElement = findInputElement();
-      
-      if (inputElement) {
+  function bindFocusTracking() {
+    document.addEventListener('focusin', (event) => {
+      const target = event.target;
+      const inputElement = isEditableElement(target)
+        ? target
+        : target && target.closest
+          ? target.closest('textarea, input[type="text"], input[type="search"], div[contenteditable="true"]')
+          : null;
+
+      if (isEditableElement(inputElement)) {
         injectButton(inputElement);
-        setupMutationObserver();
-        return;
       }
-      
-      if (attempts < maxAttempts) {
-        setTimeout(poll, pollInterval);
-      } else {
-        console.log('未找到输入框，将继续监听页面变化');
-        setupMutationObserver();
-      }
-    }
-    
-    poll();
+    });
   }
 
   function init() {
-    // 初始化国际化
     initI18n();
-    
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', pollForInputElement);
-    } else {
-      pollForInputElement();
-    }
-    
-    window.addEventListener('resize', function() {
-      if (currentInputElement && embellishButton) {
-        positionButton(currentInputElement, embellishButton);
-      }
-    });
-    
-    // 监听语言变化
-    chrome.storage.onChanged.addListener(function(changes, areaName) {
-      if (changes.language && changes.language.newValue) {
+    embellishButton = createEmbellishButton();
+    injectButton(findInputElement());
+    setupMutationObserver();
+    bindFocusTracking();
+
+    window.addEventListener('resize', schedulePositionUpdate);
+    window.addEventListener('scroll', schedulePositionUpdate, true);
+
+    chrome.storage.onChanged.addListener(function(changes) {
+      if (changes.language && changes.language.newValue && typeof I18n !== 'undefined') {
         I18n.setLocale(changes.language.newValue);
         updateButtonTexts();
       }
     });
   }
 
-  init();
-  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
 })();
