@@ -19,7 +19,14 @@
     "https://chat.deepseek.com/*",
     "https://www.deepseek.com/*",
     "https://deepseek.com/*",
-    "https://yuanbao.tencent.com/*"
+    "https://yuanbao.tencent.com/*",
+    "https://chatglm.cn/*",
+    "https://www.kimi.com/*",
+    "https://kimi.moonshot.cn/*",
+    "https://qwen.ai/*",
+    "https://chat.qwen.ai/*",
+    "https://yiyan.baidu.com/*",
+    "https://xinghuo.xfyun.cn/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -45,7 +52,14 @@
         "https://chat.deepseek.com/*",
         "https://www.deepseek.com/*",
         "https://deepseek.com/*",
-        "https://yuanbao.tencent.com/*"
+        "https://yuanbao.tencent.com/*",
+        "https://chatglm.cn/*",
+        "https://www.kimi.com/*",
+        "https://kimi.moonshot.cn/*",
+        "https://qwen.ai/*",
+        "https://chat.qwen.ai/*",
+        "https://yiyan.baidu.com/*",
+        "https://xinghuo.xfyun.cn/*"
       ],
       "js": ["i18n.js", "content.js"],
       "css": ["content.css"],

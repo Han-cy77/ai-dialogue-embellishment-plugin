@@ -37,7 +37,14 @@
         'chat.openai.com',
         'claude.ai',
         'gemini.google.com',
-        'copilot.microsoft.com'
+        'copilot.microsoft.com',
+        'chatglm.cn',
+        'www.kimi.com',
+        'kimi.moonshot.cn',
+        'qwen.ai',
+        'chat.qwen.ai',
+        'yiyan.baidu.com',
+        'xinghuo.xfyun.cn'
       ],
       selectors: [
         'textarea',
